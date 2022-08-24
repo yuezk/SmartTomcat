@@ -82,7 +82,7 @@ public class RunnerSetting {
         tomcatField = new ComboboxWithBrowseButton();
         JComboBox<TomcatInfo> comboBox = tomcatField.getComboBox();
 
-        List<TomcatInfo> tomcatInfos = TomcatInfoConfigs.getInstance().getTomcatInfos();
+        List<TomcatInfo> tomcatInfos = TomcatSettingsState.getInstance().getTomcatInfos();
         CollectionComboBoxModel<TomcatInfo> aModel = new CollectionComboBoxModel<>(tomcatInfos);
         comboBox.setModel(aModel);
 
@@ -93,22 +93,17 @@ public class RunnerSetting {
             }
 
             public void setText(JComboBox comboBox, @NotNull String text) {
-//                comboBox.getEditor().setItem(text);
-                TomcatInfo tomcatInfo = PluginUtils.getTomcatInfo(text);
+                TomcatInfo tomcatInfo = TomcatSettingsState.createTomcatInfo(text);
 
-                if (tomcatInfo != null) {
+                CollectionComboBoxModel<TomcatInfo> model = (CollectionComboBoxModel) comboBox.getModel();
 
-                    CollectionComboBoxModel<TomcatInfo> model = (CollectionComboBoxModel) comboBox.getModel();
-
-                    if (model.contains(tomcatInfo)) {
-                        int maxVersion = TomcatInfoConfigs.getInstance().getMaxVersion(tomcatInfo);
-                        tomcatInfo.setNumber(maxVersion + 1);
-                    }
-
-                    model.add(model.getSize(), tomcatInfo);
-                    model.setSelectedItem(tomcatInfo);
-
+                if (model.contains(tomcatInfo)) {
+                    int maxVersion = TomcatSettingsState.getInstance().getMaxVersion(tomcatInfo);
+                    tomcatInfo.setNumber(maxVersion + 1);
                 }
+
+                model.add(model.getSize(), tomcatInfo);
+                model.setSelectedItem(tomcatInfo);
             }
         });
     }
