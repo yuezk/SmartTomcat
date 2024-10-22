@@ -12,6 +12,7 @@ import com.intellij.execution.process.OSProcessHandler;
 import com.intellij.execution.process.ProcessTerminatedListener;
 import com.intellij.execution.runners.ExecutionEnvironment;
 import com.intellij.execution.ui.ConsoleView;
+import com.intellij.openapi.compiler.CompilerPaths;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.OrderEnumerator;
@@ -19,6 +20,7 @@ import com.intellij.openapi.roots.ProjectRootManager;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.util.registry.Registry;
 import com.intellij.openapi.util.text.StringUtil;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.util.PathsList;
 import com.poratu.idea.plugins.tomcat.utils.PluginUtils;
 import org.jetbrains.annotations.NotNull;
@@ -292,8 +294,30 @@ public class TomcatCommandLineState extends JavaCommandLineState {
             return;
         }
 
+        String moduleOutputPath = CompilerPaths.getModuleOutputPath(module, false);
+        String webappTargetDir = detectWebappTargetDir(module);
+        String webInfLib = webappTargetDir != null ? FileUtil.join(webappTargetDir, "WEB-INF", "lib") : null;
+
         if (majorVersion >= 8) {
             Element resources = createResourcesElementIfNecessary(doc, contextRoot);
+            if (moduleOutputPath != null && FileUtil.exists(webInfLib)) {
+                Element classesResources = doc.createElement("PreResources");
+                classesResources.setAttribute("base", moduleOutputPath);
+                classesResources.setAttribute("className", "org.apache.catalina.webresources.DirResourceSet");
+                classesResources.setAttribute("webAppMount", "/WEB-INF/classes");
+
+                resources.appendChild(classesResources);
+
+                Element libResources = doc.createElement("PostResources");
+                libResources.setAttribute("base", webInfLib);
+                libResources.setAttribute("className", "org.apache.catalina.webresources.DirResourceSet");
+                libResources.setAttribute("webAppMount", "/WEB-INF/lib");
+
+                resources.appendChild(libResources);
+
+                return;
+            }
+
             pathsList.getVirtualFiles().forEach(file -> {
                 Element res;
                 String tagName;
@@ -325,6 +349,20 @@ public class TomcatCommandLineState extends JavaCommandLineState {
         } else {
             throw new RuntimeException("Unsupported Tomcat version: " + tomcatVersion);
         }
+    }
+
+    private String detectWebappTargetDir(Module module) {
+        VirtualFile outputDir = CompilerPaths.getModuleOutputDirectory(module, false);
+        if (outputDir == null) {
+            return null;
+        }
+
+        VirtualFile webappTargetDir = outputDir.getParent().findChild(module.getName());
+        if (webappTargetDir == null) {
+            return null;
+        }
+
+        return webappTargetDir.getPath();
     }
 
     private Element createResourcesElementIfNecessary(Document doc, Element contextRoot) {
